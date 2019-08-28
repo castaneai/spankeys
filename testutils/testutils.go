@@ -12,6 +12,21 @@ import (
 	"cloud.google.com/go/spanner"
 )
 
+func CountsRow(ctx context.Context, sql string, c *spanner.Client) (int64, error) {
+	stmt := spanner.NewStatement(sql)
+	iter := c.Single().Query(ctx, stmt)
+	defer iter.Stop()
+	r, err := iter.Next()
+	if err != nil {
+		return 0, err
+	}
+	var cnt int64
+	if err := r.Column(0, &cnt); err != nil {
+		return 0, err
+	}
+	return cnt, nil
+}
+
 func PrepareDatabase(ctx context.Context, ddls []string) error {
 	projectID := os.Getenv("SPANNER_TEST_PROJECT_ID")
 	if projectID == "" {
