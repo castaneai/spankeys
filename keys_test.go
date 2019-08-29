@@ -65,7 +65,8 @@ CREATE INDEX %s_Name ON %s(Name)
 	assert.Equal(t, 1, len(pkCols))
 	assert.Equal(t, "ID", pkCols[0].Name)
 
-	keysets, err := spankeys.PartitionsKeySets(ctx, c, tableName, pkCols)
+	// TODO: why 19998 not 20000?
+	keysets, err := spankeys.PartitionsKeySets(ctx, c, tableName, pkCols, 20000-2)
 	if err != nil {
 		t.Fatal(err)
 	}

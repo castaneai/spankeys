@@ -10,11 +10,7 @@ import (
 	"cloud.google.com/go/spanner"
 )
 
-const (
-	mutationBatchSize = 20000
-)
-
-func PartitionsKeySets(ctx context.Context, client *spanner.Client, tableName string, pkColumns []*Column) ([]spanner.KeySet, error) {
+func PartitionsKeySets(ctx context.Context, client *spanner.Client, tableName string, pkColumns []*Column, mutationBatchSize int) ([]spanner.KeySet, error) {
 	var pkns []string
 	for _, col := range pkColumns {
 		pkns = append(pkns, fmt.Sprintf("`%s`", col.Name))
@@ -33,8 +29,12 @@ func PartitionsKeySets(ctx context.Context, client *spanner.Client, tableName st
 	if err := client.Single().Query(ctx, stmt).Do(func(r *spanner.Row) error {
 		var key spanner.Key
 		for _, col := range pkColumns {
+			var gcv spanner.GenericColumnValue
+			if err := r.ColumnByName(col.Name, &gcv); err != nil {
+				return err
+			}
 			var k interface{}
-			if err := r.ColumnByName(col.Name, &k); err != nil {
+			if err := DecodeToInterface(&gcv, &k); err != nil {
 				return err
 			}
 			key = append(key, k)

@@ -8,4 +8,5 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/google/uuid v1.1.1
 	github.com/stretchr/testify v1.4.0
+	google.golang.org/genproto v0.0.0-20190801165951-fa694d86fc64
 )

@@ -12,6 +12,17 @@ import (
 	"cloud.google.com/go/spanner"
 )
 
+func SelectOne(ctx context.Context, sql string, c *spanner.Client, ptr interface{}) error {
+	stmt := spanner.NewStatement(sql)
+	iter := c.Single().Query(ctx, stmt)
+	defer iter.Stop()
+	r, err := iter.Next()
+	if err != nil {
+		return err
+	}
+	return r.Column(0, ptr)
+}
+
 func CountsRow(ctx context.Context, sql string, c *spanner.Client) (int64, error) {
 	stmt := spanner.NewStatement(sql)
 	iter := c.Single().Query(ctx, stmt)
@@ -64,8 +75,17 @@ func PrepareDatabase(ctx context.Context, ddls []string) error {
 
 func NewSpannerClient(ctx context.Context) (*spanner.Client, error) {
 	projectID := os.Getenv("SPANNER_TEST_PROJECT_ID")
+	if projectID == "" {
+		return nil, errors.New("env: SPANNER_TEST_PROJECT_ID not set")
+	}
 	instance := os.Getenv("SPANNER_TEST_INSTANCE")
+	if instance == "" {
+		return nil, errors.New("env: SPANNER_TEST_INSTANCE not set")
+	}
 	database := os.Getenv("SPANNER_TEST_DATABASE")
+	if database == "" {
+		return nil, errors.New("env: SPANNER_TEST_DATABASE not set")
+	}
 	dsn := fmt.Sprintf("projects/%s/instances/%s/databases/%s", projectID, instance, database)
 	return spanner.NewClient(ctx, dsn)
 }
