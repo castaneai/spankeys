@@ -43,7 +43,7 @@ func PartitionsKeySets(ctx context.Context, client *spanner.Client, tableName st
 		if cnt == 0 {
 			startKey = key
 		}
-		if cnt >= mutationBatchSize {
+		if cnt+1 >= mutationBatchSize {
 			endKey := key
 			keySets = append(keySets, &spanner.KeyRange{Start: startKey, End: endKey, Kind: spanner.ClosedClosed})
 			cnt = 0
