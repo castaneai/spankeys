@@ -2,6 +2,7 @@ package spankeys
 
 import (
 	"context"
+	"fmt"
 
 	"cloud.google.com/go/spanner"
 )
@@ -13,7 +14,6 @@ type Column struct {
 type IndexColumn struct {
 	*Column
 	OrdinalPosition int64
-	IsNullable      bool
 }
 
 type IndexType string
@@ -55,49 +55,52 @@ index_columns.TABLE_NAME,
 index_columns.COLUMN_NAME,
 index_columns.ORDINAL_POSITION,
 index_columns.IS_NULLABLE
-from INFORMATION_SCHEMA.INDEXES
-inner join INFORMATION_SCHEMA.INDEX_COLUMNS
+from INFORMATION_SCHEMA.INDEX_COLUMNS
+left join INFORMATION_SCHEMA.INDEXES
 using (INDEX_NAME)
 where INDEX_COLUMNS.TABLE_SCHEMA = '' and INDEXES.TABLE_SCHEMA = ''
 order by ORDINAL_POSITION`)
 
 	indexes := make(map[string]*Index)
+	colKeys := make(map[string]struct{})
 
 	if err := client.Single().Query(ctx, stmt).Do(func(r *spanner.Row) error {
+		var table string
+		if err := r.ColumnByName("TABLE_NAME", &table); err != nil {
+			return err
+		}
 		var name string
 		if err := r.ColumnByName("INDEX_NAME", &name); err != nil {
 			return err
 		}
-		if _, ok := indexes[name]; !ok {
+		key := fmt.Sprintf("%s_%s", table, name)
+
+		if _, ok := indexes[key]; !ok {
 			var itype string
-			var parent string
-			var isUnique bool
-			var isNullFiltered bool
-			var state spanner.NullString
-			var table string
 			if err := r.ColumnByName("INDEX_TYPE", &itype); err != nil {
 				return err
 			}
+			var parent string
 			if err := r.ColumnByName("PARENT_TABLE_NAME", &parent); err != nil {
 				return err
 			}
+			var isUnique bool
 			if err := r.ColumnByName("IS_UNIQUE", &isUnique); err != nil {
 				return err
 			}
+			var isNullFiltered bool
 			if err := r.ColumnByName("IS_NULL_FILTERED", &isNullFiltered); err != nil {
 				return err
 			}
+			var state spanner.NullString
 			if err := r.ColumnByName("INDEX_STATE", &state); err != nil {
-				return err
-			}
-			if err := r.ColumnByName("TABLE_NAME", &table); err != nil {
 				return err
 			}
 			stt := IndexState_Unknown
 			if state.Valid {
 				stt = IndexState(state.StringVal)
 			}
-			indexes[name] = &Index{
+			indexes[key] = &Index{
 				Name:           name,
 				Type:           IndexType(itype),
 				Table:          table,
@@ -110,22 +113,21 @@ order by ORDINAL_POSITION`)
 		}
 
 		var colName string
-		var ordinalPos int64
-		var isNullableStr string
 		if err := r.ColumnByName("COLUMN_NAME", &colName); err != nil {
 			return err
 		}
+		var ordinalPos int64
 		if err := r.ColumnByName("ORDINAL_POSITION", &ordinalPos); err != nil {
 			return err
 		}
-		if err := r.ColumnByName("IS_NULLABLE", &isNullableStr); err != nil {
-			return err
+		colKey := fmt.Sprintf("%s_%s", key, colName)
+		if _, exists := colKeys[colKey]; !exists {
+			indexes[key].Columns = append(indexes[key].Columns, &IndexColumn{
+				Column:          &Column{Name: colName},
+				OrdinalPosition: ordinalPos,
+			})
+			colKeys[colKey] = struct{}{}
 		}
-		indexes[name].Columns = append(indexes[name].Columns, &IndexColumn{
-			Column:          &Column{Name: colName},
-			OrdinalPosition: ordinalPos,
-			IsNullable:      isNullableStr == "YES",
-		})
 		return nil
 	}); err != nil {
 		return nil, err
