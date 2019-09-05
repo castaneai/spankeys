@@ -9,7 +9,12 @@ import (
 	"cloud.google.com/go/spanner"
 )
 
-func PartitionsKeySets(ctx context.Context, client *spanner.Client, tableName string, pkColumns []*Column, mutationBatchSize, selectLimit int) ([]spanner.KeySet, error) {
+type CountableKeyRange struct {
+	*spanner.KeyRange
+	RowCount int64
+}
+
+func PartitionsKeyRanges(ctx context.Context, client *spanner.Client, tableName string, pkColumns []*Column, mutationBatchSize, selectLimit int) ([]*CountableKeyRange, error) {
 	var pkns []string
 	for _, col := range pkColumns {
 		pkns = append(pkns, fmt.Sprintf("`%s`", col.Name))
@@ -20,7 +25,7 @@ func PartitionsKeySets(ctx context.Context, client *spanner.Client, tableName st
 	sql := fmt.Sprintf("SELECT %s FROM `%s` ORDER BY %s ASC LIMIT %d", strings.Join(pkns, ","), tableName, pkns[0], selectLimit)
 	stmt := spanner.NewStatement(sql)
 
-	var keySets []spanner.KeySet
+	var keySets []*CountableKeyRange
 	var startKey spanner.Key
 	var currentKey spanner.Key
 	cnt := 0
@@ -41,19 +46,24 @@ func PartitionsKeySets(ctx context.Context, client *spanner.Client, tableName st
 		if cnt == 0 {
 			startKey = key
 		}
-		if cnt+1 >= mutationBatchSize {
+		cnt++
+		if cnt >= mutationBatchSize {
 			endKey := key
-			keySets = append(keySets, &spanner.KeyRange{Start: startKey, End: endKey, Kind: spanner.ClosedClosed})
+			keySets = append(keySets, &CountableKeyRange{
+				KeyRange: &spanner.KeyRange{Start: startKey, End: endKey, Kind: spanner.ClosedClosed},
+				RowCount: int64(cnt),
+			})
 			cnt = 0
-		} else {
-			cnt++
 		}
 		return nil
 	}); err != nil {
 		return nil, err
 	}
 	if cnt > 0 && currentKey != nil {
-		keySets = append(keySets, &spanner.KeyRange{Start: startKey, End: currentKey, Kind: spanner.ClosedClosed})
+		keySets = append(keySets, &CountableKeyRange{
+			KeyRange: &spanner.KeyRange{Start: startKey, End: currentKey, Kind: spanner.ClosedClosed},
+			RowCount: int64(cnt),
+		})
 		cnt = 0
 	}
 	return keySets, nil

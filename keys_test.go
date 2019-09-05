@@ -66,7 +66,7 @@ CREATE INDEX %s_Name ON %s(Name)
 	assert.Equal(t, "ID", pkCols[0].Name)
 
 	// total mutations (20000) = KeyRange 1 mutation + 19999 indexed rows
-	keysets, err := spankeys.PartitionsKeySets(ctx, c, tableName, pkCols, 19999, 100000)
+	keysets, err := spankeys.PartitionsKeyRanges(ctx, c, tableName, pkCols, 19999, 100000)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,11 +144,13 @@ CREATE TABLE %s (
 
 	// total mutations (20000) = KeyRange 1 mutation + 19999 indexed rows
 	// for delete ranges, keys only first key part, so using pkCols[:1]
-	keysets, err := spankeys.PartitionsKeySets(ctx, c, tableName, pkCols[:1], 19999, 100000)
+	keysets, err := spankeys.PartitionsKeyRanges(ctx, c, tableName, pkCols[:1], 19999, 100000)
 	if err != nil {
 		t.Fatal(err)
 	}
 	assert.Equal(t, 2, len(keysets))
+	assert.Equal(t, int64(19999), keysets[0].RowCount)
+	assert.Equal(t, int64(5001), keysets[1].RowCount)
 
 	// delete all rows by partitioned keysets
 	for _, ks := range keysets {
