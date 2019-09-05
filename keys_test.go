@@ -65,8 +65,8 @@ CREATE INDEX %s_Name ON %s(Name)
 	assert.Equal(t, 1, len(pkCols))
 	assert.Equal(t, "ID", pkCols[0].Name)
 
-	// TODO: why 19998 not 20000?
-	keysets, err := spankeys.PartitionsKeySets(ctx, c, tableName, pkCols, 20000-2)
+	// total mutations (20000) = KeyRange 1 mutation + 19999 indexed rows
+	keysets, err := spankeys.PartitionsKeySets(ctx, c, tableName, pkCols, 19999, 100000)
 	if err != nil {
 		t.Fatal(err)
 	}

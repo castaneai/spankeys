@@ -10,7 +10,7 @@ import (
 	"cloud.google.com/go/spanner"
 )
 
-func PartitionsKeySets(ctx context.Context, client *spanner.Client, tableName string, pkColumns []*Column, mutationBatchSize int) ([]spanner.KeySet, error) {
+func PartitionsKeySets(ctx context.Context, client *spanner.Client, tableName string, pkColumns []*Column, mutationBatchSize, selectLimit int) ([]spanner.KeySet, error) {
 	var pkns []string
 	for _, col := range pkColumns {
 		pkns = append(pkns, fmt.Sprintf("`%s`", col.Name))
@@ -18,7 +18,7 @@ func PartitionsKeySets(ctx context.Context, client *spanner.Client, tableName st
 	if len(pkns) < 1 {
 		return nil, errors.New("at least one of Primary Key is required")
 	}
-	sql := fmt.Sprintf("SELECT %s FROM `%s` ORDER BY %s ASC", strings.Join(pkns, ","), tableName, pkns[0])
+	sql := fmt.Sprintf("SELECT %s FROM `%s` ORDER BY %s ASC LIMIT %d", strings.Join(pkns, ","), tableName, pkns[0], selectLimit)
 	log.Printf(sql)
 	stmt := spanner.NewStatement(sql)
 
