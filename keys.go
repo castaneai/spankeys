@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 
 	"cloud.google.com/go/spanner"
@@ -19,7 +18,6 @@ func PartitionsKeySets(ctx context.Context, client *spanner.Client, tableName st
 		return nil, errors.New("at least one of Primary Key is required")
 	}
 	sql := fmt.Sprintf("SELECT %s FROM `%s` ORDER BY %s ASC LIMIT %d", strings.Join(pkns, ","), tableName, pkns[0], selectLimit)
-	log.Printf(sql)
 	stmt := spanner.NewStatement(sql)
 
 	var keySets []spanner.KeySet
