@@ -42,6 +42,34 @@ type Index struct {
 	Columns        []*IndexColumn
 }
 
+func GetSecondaryIndexes(ctx context.Context, client *spanner.Client, table string) ([]*Index, error) {
+	idxes, err := GetTableIndexes(ctx, client, table)
+	if err != nil {
+		return nil, err
+	}
+	var sis []*Index
+	for _, idx := range idxes {
+		if !idx.IsPrimaryKey {
+			sis = append(sis, idx)
+		}
+	}
+	return sis, nil
+}
+
+func GetTableIndexes(ctx context.Context, client *spanner.Client, table string) ([]*Index, error) {
+	idxes, err := GetIndexes(ctx, client)
+	if err != nil {
+		return nil, err
+	}
+	var tis []*Index
+	for _, idx := range idxes {
+		if idx.Table == table {
+			tis = append(tis, idx)
+		}
+	}
+	return tis, nil
+}
+
 func GetIndexes(ctx context.Context, client *spanner.Client) ([]*Index, error) {
 	stmt := spanner.NewStatement(`
 select 
