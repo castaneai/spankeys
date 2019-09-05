@@ -10,7 +10,7 @@ import (
 )
 
 type CountableKeyRange struct {
-	*spanner.KeyRange
+	spanner.KeyRange
 	RowCount int64
 }
 
@@ -50,7 +50,7 @@ func PartitionsKeyRanges(ctx context.Context, client *spanner.Client, tableName 
 		if cnt >= mutationBatchSize {
 			endKey := key
 			keySets = append(keySets, &CountableKeyRange{
-				KeyRange: &spanner.KeyRange{Start: startKey, End: endKey, Kind: spanner.ClosedClosed},
+				KeyRange: spanner.KeyRange{Start: startKey, End: endKey, Kind: spanner.ClosedClosed},
 				RowCount: int64(cnt),
 			})
 			cnt = 0
@@ -61,7 +61,7 @@ func PartitionsKeyRanges(ctx context.Context, client *spanner.Client, tableName 
 	}
 	if cnt > 0 && currentKey != nil {
 		keySets = append(keySets, &CountableKeyRange{
-			KeyRange: &spanner.KeyRange{Start: startKey, End: currentKey, Kind: spanner.ClosedClosed},
+			KeyRange: spanner.KeyRange{Start: startKey, End: currentKey, Kind: spanner.ClosedClosed},
 			RowCount: int64(cnt),
 		})
 		cnt = 0
