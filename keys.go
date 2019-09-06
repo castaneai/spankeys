@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 
 	"cloud.google.com/go/spanner"
@@ -12,6 +13,41 @@ import (
 type CountableKeyRange struct {
 	spanner.KeyRange
 	RowCount int64
+}
+
+func CountIndexesWithChildren(ctx context.Context, client *spanner.Client, tableName string) (int, error) {
+	idxCnt := 0
+	secIdxes, err := GetSecondaryIndexes(ctx, client, tableName)
+	if err != nil {
+		return 0, err
+	}
+	idxCnt += len(secIdxes)
+	children, err := GetInterleaveChildren(ctx, client, tableName)
+	if err != nil {
+		return 0, err
+	}
+	for _, child := range children {
+		if child.OnDelete == OnDeleteCascade {
+			cnt, err := CountIndexesWithChildren(ctx, client, child.Table)
+			if err != nil {
+				return 0, err
+			}
+			idxCnt += cnt
+		}
+	}
+	return idxCnt, nil
+}
+
+func CalcMutationBatchSize(ctx context.Context, client *spanner.Client, tableName string) (int, error) {
+	idxCnt, err := CountIndexesWithChildren(ctx, client, tableName)
+	if err != nil {
+		return 0, err
+	}
+	if idxCnt == 0 {
+		// if the table has no index, mutation count is 1 regardless of the number of rows
+		return math.MaxInt32, nil
+	}
+	return 20000/idxCnt - 1, nil
 }
 
 func PartitionsKeyRanges(ctx context.Context, client *spanner.Client, tableName string, pkColumns []*Column, mutationBatchSize, selectLimit int) ([]*CountableKeyRange, error) {
