@@ -16,6 +16,18 @@ type IndexColumn struct {
 	OrdinalPosition int64
 }
 
+type Interleave struct {
+	Table    string
+	OnDelete OnDelete
+}
+
+type OnDelete int
+
+const (
+	OnDeleteNoAction OnDelete = iota
+	OnDeleteCascade
+)
+
 type IndexType string
 type IndexState string
 
@@ -40,6 +52,37 @@ type Index struct {
 	IsNullFiltered bool
 	State          IndexState
 	Columns        []*IndexColumn
+}
+
+func GetInterleaveChildren(ctx context.Context, client *spanner.Client, parentTable string) ([]*Interleave, error) {
+	stmt := spanner.NewStatement(fmt.Sprintf(`
+select * from INFORMATION_SCHEMA.TABLES
+where TABLE_SCHEMA = '' and PARENT_TABLE_NAME = '%s';
+`, parentTable))
+
+	var is []*Interleave
+	if err := client.Single().Query(ctx, stmt).Do(func(r *spanner.Row) error {
+		var table string
+		if err := r.ColumnByName("TABLE_NAME", &table); err != nil {
+			return err
+		}
+		var onDelete string
+		if err := r.ColumnByName("ON_DELETE_ACTION", &onDelete); err != nil {
+			return err
+		}
+		onDeleteAction := OnDeleteNoAction
+		if onDelete == "CASCADE" {
+			onDeleteAction = OnDeleteCascade
+		}
+		is = append(is, &Interleave{
+			Table:    table,
+			OnDelete: onDeleteAction,
+		})
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return is, nil
 }
 
 func GetSecondaryIndexes(ctx context.Context, client *spanner.Client, table string) ([]*Index, error) {

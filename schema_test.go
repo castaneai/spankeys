@@ -154,3 +154,72 @@ CREATE UNIQUE INDEX InterleavedPK_ID_Name ON InterleavedPK(ID, Name), INTERLEAVE
 		}
 	}
 }
+
+func TestGetInterleaveChildren(t *testing.T) {
+	ctx := context.Background()
+	if err := testutils.PrepareDatabase(ctx, []string{`
+CREATE TABLE Parent (
+    ParentID STRING(36) NOT NULL,
+    Name STRING(255) NOT NULL,
+) PRIMARY KEY (ParentID)
+`, `
+CREATE TABLE ChildA (
+    ParentID STRING(36) NOT NULL,
+	ChildAID STRING(36) NOT NULL,
+    Name STRING(255) NOT NULL,
+) PRIMARY KEY (ParentID, ChildAID),
+INTERLEAVE IN PARENT Parent ON DELETE CASCADE
+`, `
+CREATE TABLE ChildAA (
+    ParentID STRING(36) NOT NULL,
+	ChildAID STRING(36) NOT NULL,
+	ChildAAID STRING(36) NOT NULL,
+    Name STRING(255) NOT NULL,
+) PRIMARY KEY (ParentID, ChildAID, ChildAAID),
+INTERLEAVE IN PARENT ChildA ON DELETE NO ACTION 
+`, `
+CREATE TABLE ChildB (
+    ParentID STRING(36) NOT NULL,
+	ChildBID STRING(36) NOT NULL,
+    Name STRING(255) NOT NULL,
+) PRIMARY KEY (ParentID, ChildBID),
+INTERLEAVE IN PARENT Parent ON DELETE CASCADE
+`}); err != nil {
+		t.Fatal(err)
+	}
+
+	c, err := testutils.NewSpannerClient(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	{
+		is, err := spankeys.GetInterleaveChildren(ctx, c, "Parent")
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, 2, len(is))
+		assert.Equal(t, "ChildA", is[0].Table)
+		assert.Equal(t, spankeys.OnDeleteCascade, is[0].OnDelete)
+		assert.Equal(t, "ChildB", is[1].Table)
+		assert.Equal(t, spankeys.OnDeleteCascade, is[1].OnDelete)
+	}
+
+	{
+		is, err := spankeys.GetInterleaveChildren(ctx, c, "ChildA")
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, 1, len(is))
+		assert.Equal(t, "ChildAA", is[0].Table)
+		assert.Equal(t, spankeys.OnDeleteNoAction, is[0].OnDelete)
+	}
+
+	{
+		is, err := spankeys.GetInterleaveChildren(ctx, c, "ChildB")
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, 0, len(is))
+	}
+}
