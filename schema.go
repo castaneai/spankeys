@@ -7,6 +7,11 @@ import (
 	"cloud.google.com/go/spanner"
 )
 
+type Table struct {
+	Name       string
+	Interleave *Interleave
+}
+
 type Column struct {
 	Name string
 }
@@ -32,14 +37,14 @@ type IndexType string
 type IndexState string
 
 const (
-	IndexType_Index                    IndexType  = "INDEX"
-	IndexType_PrimaryKey               IndexType  = "PRIMARY_KEY"
-	IndexState_Prepare                 IndexState = "PREPARE"
-	IndexState_Unknown                 IndexState = ""
-	IndexState_WriteOnly               IndexState = "WRITE_ONLY"
-	IndexState_WriteOnlyCleanup        IndexState = "WRITE_ONLY_CLEANUP"
-	IndexState_WriteOnlyValidateUnique IndexState = "WRITE_ONLY_VALIDATE_UNIQUE"
-	IndexState_ReadWrite               IndexState = "READ_WRITE"
+	IndexTypeIndex                    IndexType  = "INDEX"
+	IndexTypePrimaryKey               IndexType  = "PRIMARY_KEY"
+	IndexStatePrepare                 IndexState = "PREPARE"
+	IndexStateUnknown                 IndexState = ""
+	IndexStateWriteOnly               IndexState = "WRITE_ONLY"
+	IndexStateWriteOnlyCleanup        IndexState = "WRITE_ONLY_CLEANUP"
+	IndexStateWriteOnlyValidateUnique IndexState = "WRITE_ONLY_VALIDATE_UNIQUE"
+	IndexStateReadWrite               IndexState = "READ_WRITE"
 )
 
 type Index struct {
@@ -52,6 +57,45 @@ type Index struct {
 	IsNullFiltered bool
 	State          IndexState
 	Columns        []*IndexColumn
+}
+
+func GetTables(ctx context.Context, client *spanner.Client) ([]*Table, error) {
+	stmt := spanner.NewStatement(`
+select * from INFORMATION_SCHEMA.TABLES
+where TABLE_SCHEMA = ''
+`)
+	var ts []*Table
+	if err := client.Single().Query(ctx, stmt).Do(func(r *spanner.Row) error {
+		var name string
+		if err := r.ColumnByName("TABLE_NAME", &name); err != nil {
+			return err
+		}
+		t := &Table{
+			Name:       name,
+			Interleave: nil,
+		}
+
+		var parentTable spanner.NullString
+		if err := r.ColumnByName("PARENT_TABLE_NAME", &parentTable); err != nil {
+			return err
+		}
+		var onDelete spanner.NullString
+		if err := r.ColumnByName("ON_DELETE_ACTION", &onDelete); err != nil {
+			return err
+		}
+		if parentTable.Valid {
+			onDeleteAction := OnDeleteNoAction
+			if onDelete.StringVal == "CASCADE" {
+				onDeleteAction = OnDeleteCascade
+			}
+			t.Interleave = &Interleave{Table: parentTable.StringVal, OnDelete: onDeleteAction}
+		}
+		ts = append(ts, t)
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return ts, nil
 }
 
 func GetInterleaveChildren(ctx context.Context, client *spanner.Client, parentTable string) ([]*Interleave, error) {
@@ -167,7 +211,7 @@ order by ORDINAL_POSITION`)
 			if err := r.ColumnByName("INDEX_STATE", &state); err != nil {
 				return err
 			}
-			stt := IndexState_Unknown
+			stt := IndexStateUnknown
 			if state.Valid {
 				stt = IndexState(state.StringVal)
 			}

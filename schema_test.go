@@ -11,6 +11,54 @@ import (
 	"github.com/castaneai/spankeys"
 )
 
+func TestGetTables(t *testing.T) {
+	ctx := context.Background()
+	if err := testutils.PrepareDatabase(ctx, []string{`
+CREATE TABLE SinglePK (
+    ID STRING(36) NOT NULL,
+    Name STRING(255) NOT NULL,
+) PRIMARY KEY (ID)
+`, `
+CREATE TABLE CompositePK (
+    ID1 STRING(36) NOT NULL,
+	ID2 STRING(36) NOT NULL,
+    Name STRING(255) NOT NULL,
+) PRIMARY KEY (ID1, ID2)
+`, `
+CREATE TABLE InterleavedPK (
+    ID STRING(36) NOT NULL,
+	ChildID STRING(36) NOT NULL,
+    Name STRING(255) NOT NULL,
+) PRIMARY KEY (ID, ChildID),
+INTERLEAVE IN PARENT SinglePK ON DELETE CASCADE
+`}); err != nil {
+		t.Fatal(err)
+	}
+
+	c, err := testutils.NewSpannerClient(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ts, err := spankeys.GetTables(ctx, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, 3, len(ts))
+	for _, tbl := range ts {
+		if tbl.Name == "SinglePK" {
+			assert.Nil(t, tbl.Interleave)
+		}
+		if tbl.Name == "CompositePK" {
+			assert.Nil(t, tbl.Interleave)
+		}
+		if tbl.Name == "InterleavedPK" {
+			assert.Equal(t, "SinglePK", tbl.Interleave.Table)
+		}
+	}
+}
+
 func TestGetPrimaryKeyColumns(t *testing.T) {
 	ctx := context.Background()
 	if err := testutils.PrepareDatabase(ctx, []string{`
