@@ -5,9 +5,9 @@ convenient methods for Cloud Spanner
 
 Set following environment variables.
 
-- `SPANNER_TEST_PROJECT_ID`
-- `SPANNER_TEST_INSTANCE`
-- `SPANNER_TEST_DATABASE`
+- `SPANNER_PROJECT_ID`
+- `SPANNER_INSTANCE_ID`
+- `SPANNER_DATABASE_ID`
 
 ```
 go test ./...
