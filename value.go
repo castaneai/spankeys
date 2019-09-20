@@ -89,6 +89,27 @@ func DecodeToInterface(gcv *spanner.GenericColumnValue, ptr interface{}) error {
 		}
 		reflect.ValueOf(ptr).Elem().Set(reflect.ValueOf(v))
 		return nil
+	case sppb.TypeCode_ARRAY:
+		lv, err := getListValue(gcv.Value)
+		if err != nil {
+			return err
+		}
+		switch gcv.Type.ArrayElementType.Code {
+		case sppb.TypeCode_BOOL:
+			v := make([]bool, len(lv.Values))
+			if err := gcv.Decode(&v); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("failed to decode GenericColumnValue(typeCode: %s, elementType: %s)", gcv.Type.Code, gcv.Type.ArrayElementType.Code)
+		}
 	}
 	return fmt.Errorf("failed to decode GenericColumnValue(typeCode: %s)", gcv.Type.Code)
+}
+
+func getListValue(v *proto3.Value) (*proto3.ListValue, error) {
+	if x, ok := v.GetKind().(*proto3.Value_ListValue); ok && x != nil {
+		return x.ListValue, nil
+	}
+	return nil, fmt.Errorf("cannot convert to ListValue")
 }
