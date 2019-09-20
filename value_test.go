@@ -18,6 +18,9 @@ import (
 
 func TestDecodeToInterface(t *testing.T) {
 	ctx := context.Background()
+	if err := testutils.PrepareDatabase(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
 	c, err := testutils.NewSpannerClient(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -120,6 +123,19 @@ func TestDecodeToInterface(t *testing.T) {
 			t.Fatal(err)
 		}
 		assert.Equal(t, []byte("AbCd"), v.([]byte))
+	}
+
+	// nullable values
+	{
+		var gcv spanner.GenericColumnValue
+		if err := testutils.SelectOne(ctx, `select NULL`, c, &gcv); err != nil {
+			t.Fatal(err)
+		}
+		var v interface{}
+		if err := spankeys.DecodeToInterface(&gcv, &v); err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, spanner.NullInt64{}, v)
 	}
 
 	// TODO: array, struct
