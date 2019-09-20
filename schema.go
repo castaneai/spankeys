@@ -13,12 +13,12 @@ type Table struct {
 }
 
 type Column struct {
-	Name string
+	Name            string
+	OrdinalPosition int64
 }
 
 type IndexColumn struct {
-	*Column
-	OrdinalPosition int64
+	Column
 }
 
 type Interleave struct {
@@ -231,15 +231,14 @@ order by ORDINAL_POSITION`)
 		if err := r.ColumnByName("COLUMN_NAME", &colName); err != nil {
 			return err
 		}
-		var ordinalPos int64
-		if err := r.ColumnByName("ORDINAL_POSITION", &ordinalPos); err != nil {
+		var op int64
+		if err := r.ColumnByName("ORDINAL_POSITION", &op); err != nil {
 			return err
 		}
 		colKey := fmt.Sprintf("%s_%s", key, colName)
 		if _, exists := colKeys[colKey]; !exists {
 			indexes[key].Columns = append(indexes[key].Columns, &IndexColumn{
-				Column:          &Column{Name: colName},
-				OrdinalPosition: ordinalPos,
+				Column{Name: colName, OrdinalPosition: op},
 			})
 			colKeys[colKey] = struct{}{}
 		}
@@ -255,8 +254,29 @@ order by ORDINAL_POSITION`)
 	return idxes, nil
 }
 
+func GetColumns(ctx context.Context, client *spanner.Client, table string) ([]*Column, error) {
+	stmt := spanner.NewStatement("select column_name, ordinal_position from INFORMATION_SCHEMA.COLUMNS where table_name = @tableName order by ordinal_position")
+	stmt.Params["tableName"] = table
+	var cols []*Column
+	if err := client.Single().Query(ctx, stmt).Do(func(r *spanner.Row) error {
+		var name string
+		if err := r.Column(0, &name); err != nil {
+			return err
+		}
+		var op int64
+		if err := r.Column(1, &op); err != nil {
+			return err
+		}
+		cols = append(cols, &Column{Name: name, OrdinalPosition: op})
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return cols, nil
+}
+
 func GetPrimaryKeyColumns(ctx context.Context, client *spanner.Client, table string) ([]*Column, error) {
-	stmt := spanner.NewStatement("select column_name from INFORMATION_SCHEMA.INDEX_COLUMNS where table_name = @tableName and index_type = 'PRIMARY_KEY' order by ordinal_position")
+	stmt := spanner.NewStatement("select column_name, ordinal_position from INFORMATION_SCHEMA.INDEX_COLUMNS where table_name = @tableName and index_type = 'PRIMARY_KEY' order by ordinal_position")
 	stmt.Params["tableName"] = table
 	var pks []*Column
 	if err := client.Single().Query(ctx, stmt).Do(func(r *spanner.Row) error {
@@ -264,7 +284,11 @@ func GetPrimaryKeyColumns(ctx context.Context, client *spanner.Client, table str
 		if err := r.Column(0, &name); err != nil {
 			return err
 		}
-		pks = append(pks, &Column{Name: name})
+		var op int64
+		if err := r.Column(1, &op); err != nil {
+			return err
+		}
+		pks = append(pks, &Column{Name: name, OrdinalPosition: op})
 		return nil
 	}); err != nil {
 		return nil, err

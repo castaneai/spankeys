@@ -59,6 +59,36 @@ INTERLEAVE IN PARENT SinglePK ON DELETE CASCADE
 	}
 }
 
+func TestGetColumns(t *testing.T) {
+	ctx := context.Background()
+	if err := testutils.PrepareDatabase(ctx, []string{`
+CREATE TABLE TestGetColumns (
+    ID STRING(36) NOT NULL,
+    Name STRING(255) NOT NULL,
+	Age INT64 NOT NULL,
+) PRIMARY KEY (ID)
+`}); err != nil {
+		t.Fatal(err)
+	}
+
+	c, err := testutils.NewSpannerClient(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cols, err := spankeys.GetColumns(ctx, c, "TestGetColumns")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, 3, len(cols))
+	assert.Equal(t, "ID", cols[0].Name)
+	assert.Equal(t, int64(1), cols[0].OrdinalPosition)
+	assert.Equal(t, "Name", cols[1].Name)
+	assert.Equal(t, int64(2), cols[1].OrdinalPosition)
+	assert.Equal(t, "Age", cols[2].Name)
+	assert.Equal(t, int64(3), cols[2].OrdinalPosition)
+}
+
 func TestGetPrimaryKeyColumns(t *testing.T) {
 	ctx := context.Background()
 	if err := testutils.PrepareDatabase(ctx, []string{`
@@ -104,7 +134,9 @@ INTERLEAVE IN PARENT SinglePK ON DELETE CASCADE
 		}
 		assert.Equal(t, 2, len(pks))
 		assert.Equal(t, "ID1", pks[0].Name)
+		assert.Equal(t, int64(1), pks[0].OrdinalPosition)
 		assert.Equal(t, "ID2", pks[1].Name)
+		assert.Equal(t, int64(2), pks[1].OrdinalPosition)
 	}
 
 	{
