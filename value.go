@@ -94,12 +94,99 @@ func DecodeToInterface(gcv *spanner.GenericColumnValue, ptr interface{}) error {
 		if err != nil {
 			return err
 		}
+		cnull := containsNull(lv)
+
 		switch gcv.Type.ArrayElementType.Code {
 		case sppb.TypeCode_BOOL:
+			if cnull {
+				v := make([]spanner.NullBool, len(lv.Values))
+				if err := gcv.Decode(&v); err != nil {
+					return err
+				}
+				reflect.ValueOf(ptr).Elem().Set(reflect.ValueOf(v))
+				return nil
+			}
 			v := make([]bool, len(lv.Values))
 			if err := gcv.Decode(&v); err != nil {
 				return err
 			}
+			reflect.ValueOf(ptr).Elem().Set(reflect.ValueOf(v))
+			return nil
+		case sppb.TypeCode_INT64:
+			if cnull {
+				v := make([]spanner.NullInt64, len(lv.Values))
+				if err := gcv.Decode(&v); err != nil {
+					return err
+				}
+				reflect.ValueOf(ptr).Elem().Set(reflect.ValueOf(v))
+				return nil
+			}
+			v := make([]int64, len(lv.Values))
+			if err := gcv.Decode(&v); err != nil {
+				return err
+			}
+			reflect.ValueOf(ptr).Elem().Set(reflect.ValueOf(v))
+			return nil
+		case sppb.TypeCode_FLOAT64:
+			if cnull {
+				v := make([]spanner.NullFloat64, len(lv.Values))
+				if err := gcv.Decode(&v); err != nil {
+					return err
+				}
+				reflect.ValueOf(ptr).Elem().Set(reflect.ValueOf(v))
+				return nil
+			}
+			v := make([]float64, len(lv.Values))
+			if err := gcv.Decode(&v); err != nil {
+				return err
+			}
+			reflect.ValueOf(ptr).Elem().Set(reflect.ValueOf(v))
+			return nil
+		case sppb.TypeCode_STRING:
+			if cnull {
+				v := make([]spanner.NullString, len(lv.Values))
+				if err := gcv.Decode(&v); err != nil {
+					return err
+				}
+				reflect.ValueOf(ptr).Elem().Set(reflect.ValueOf(v))
+				return nil
+			}
+			v := make([]string, len(lv.Values))
+			if err := gcv.Decode(&v); err != nil {
+				return err
+			}
+			reflect.ValueOf(ptr).Elem().Set(reflect.ValueOf(v))
+			return nil
+		case sppb.TypeCode_DATE:
+			if cnull {
+				v := make([]spanner.NullDate, len(lv.Values))
+				if err := gcv.Decode(&v); err != nil {
+					return err
+				}
+				reflect.ValueOf(ptr).Elem().Set(reflect.ValueOf(v))
+				return nil
+			}
+			v := make([]civil.Date, len(lv.Values))
+			if err := gcv.Decode(&v); err != nil {
+				return err
+			}
+			reflect.ValueOf(ptr).Elem().Set(reflect.ValueOf(v))
+			return nil
+		case sppb.TypeCode_TIMESTAMP:
+			if cnull {
+				v := make([]spanner.NullTime, len(lv.Values))
+				if err := gcv.Decode(&v); err != nil {
+					return err
+				}
+				reflect.ValueOf(ptr).Elem().Set(reflect.ValueOf(v))
+				return nil
+			}
+			v := make([]time.Time, len(lv.Values))
+			if err := gcv.Decode(&v); err != nil {
+				return err
+			}
+			reflect.ValueOf(ptr).Elem().Set(reflect.ValueOf(v))
+			return nil
 		default:
 			return fmt.Errorf("failed to decode GenericColumnValue(typeCode: %s, elementType: %s)", gcv.Type.Code, gcv.Type.ArrayElementType.Code)
 		}
@@ -112,4 +199,14 @@ func getListValue(v *proto3.Value) (*proto3.ListValue, error) {
 		return x.ListValue, nil
 	}
 	return nil, fmt.Errorf("cannot convert to ListValue")
+}
+
+func containsNull(list *proto3.ListValue) bool {
+	for _, v := range list.Values {
+		_, isNull := v.Kind.(*proto3.Value_NullValue)
+		if isNull {
+			return true
+		}
+	}
+	return false
 }

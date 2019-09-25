@@ -142,7 +142,7 @@ func TestDecodeToInterface(t *testing.T) {
 	// array
 	{
 		var gcv spanner.GenericColumnValue
-		if err := testutils.SelectOne(ctx, `select [null, 2, 3]`, c, &gcv); err != nil {
+		if err := testutils.SelectOne(ctx, `select [1, 2, 3]`, c, &gcv); err != nil {
 			t.Fatal(err)
 		}
 		var v interface{}
@@ -150,5 +150,18 @@ func TestDecodeToInterface(t *testing.T) {
 			t.Fatal(err)
 		}
 		assert.ElementsMatch(t, []int64{1, 2, 3}, v)
+	}
+
+	// array contains null
+	{
+		var gcv spanner.GenericColumnValue
+		if err := testutils.SelectOne(ctx, `select [1, null, 3]`, c, &gcv); err != nil {
+			t.Fatal(err)
+		}
+		var v interface{}
+		if err := spankeys.DecodeToInterface(&gcv, &v); err != nil {
+			t.Fatal(err)
+		}
+		assert.ElementsMatch(t, []spanner.NullInt64{{1, true}, {0, false}, {3, true}}, v)
 	}
 }
