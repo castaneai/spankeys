@@ -5,30 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/castaneai/spadmin"
+	"github.com/castaneai/spankeys"
 
 	"cloud.google.com/go/spanner"
 )
-
-type DSN string
-
-func (d DSN) Parent() string {
-	return strings.Join(strings.Split(string(d), "/")[:4], "/")
-}
-
-func (d DSN) ProjectID() string {
-	return strings.Split(string(d), "/")[1]
-}
-
-func (d DSN) InstanceID() string {
-	return strings.Split(string(d), "/")[3]
-}
-
-func (d DSN) DatabaseID() string {
-	return strings.Split(string(d), "/")[5]
-}
 
 func SelectOne(ctx context.Context, sql string, c *spanner.Client, ptr interface{}) error {
 	stmt := spanner.NewStatement(sql)
@@ -80,7 +62,7 @@ func PrepareDatabase(ctx context.Context, ddls []string) error {
 	return nil
 }
 
-func makeDSNFromEnv() (DSN, error) {
+func makeDSNFromEnv() (spankeys.DSN, error) {
 	projectID := os.Getenv("SPANNER_PROJECT_ID")
 	if projectID == "" {
 		return "", errors.New("env: SPANNER_PROJECT_ID not set")
@@ -93,7 +75,7 @@ func makeDSNFromEnv() (DSN, error) {
 	if database == "" {
 		return "", errors.New("env: SPANNER_DATABASE_ID not set")
 	}
-	return DSN(fmt.Sprintf("projects/%s/instances/%s/databases/%s", projectID, instance, database)), nil
+	return spankeys.DSN(fmt.Sprintf("projects/%s/instances/%s/databases/%s", projectID, instance, database)), nil
 }
 
 func NewSpannerClient(ctx context.Context) (*spanner.Client, error) {
