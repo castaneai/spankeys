@@ -90,6 +90,9 @@ func DecodeToInterface(gcv *spanner.GenericColumnValue, ptr interface{}) error {
 		reflect.ValueOf(ptr).Elem().Set(reflect.ValueOf(v))
 		return nil
 	case sppb.TypeCode_ARRAY:
+		if isNull {
+			return handleNullArray(gcv.Type.ArrayElementType.Code, ptr)
+		}
 		lv, err := getListValue(gcv.Value)
 		if err != nil {
 			return err
@@ -187,11 +190,55 @@ func DecodeToInterface(gcv *spanner.GenericColumnValue, ptr interface{}) error {
 			}
 			reflect.ValueOf(ptr).Elem().Set(reflect.ValueOf(v))
 			return nil
+		case sppb.TypeCode_ARRAY:
+			return fmt.Errorf("nested ARRAY type is not supported")
+		case sppb.TypeCode_STRUCT:
+			return fmt.Errorf("STRUCT type in ARRAY is not supported")
 		default:
 			return fmt.Errorf("failed to decode GenericColumnValue(typeCode: %s, elementType: %s)", gcv.Type.Code, gcv.Type.ArrayElementType.Code)
 		}
+	case sppb.TypeCode_STRUCT:
+		return fmt.Errorf("STRUCT type is not supported")
 	}
 	return fmt.Errorf("failed to decode GenericColumnValue(typeCode: %s)", gcv.Type.Code)
+}
+
+func handleNullArray(elemCode sppb.TypeCode, ptr interface{}) error {
+	switch elemCode {
+	case sppb.TypeCode_BOOL:
+		var v []bool
+		reflect.ValueOf(ptr).Elem().Set(reflect.ValueOf(v))
+		return nil
+	case sppb.TypeCode_INT64:
+		var v []int64
+		reflect.ValueOf(ptr).Elem().Set(reflect.ValueOf(v))
+		return nil
+	case sppb.TypeCode_FLOAT64:
+		var v []float64
+		reflect.ValueOf(ptr).Elem().Set(reflect.ValueOf(v))
+		return nil
+	case sppb.TypeCode_TIMESTAMP:
+		var v []time.Time
+		reflect.ValueOf(ptr).Elem().Set(reflect.ValueOf(v))
+		return nil
+	case sppb.TypeCode_DATE:
+		var v []civil.Date
+		reflect.ValueOf(ptr).Elem().Set(reflect.ValueOf(v))
+		return nil
+	case sppb.TypeCode_STRING:
+		var v []string
+		reflect.ValueOf(ptr).Elem().Set(reflect.ValueOf(v))
+		return nil
+	case sppb.TypeCode_BYTES:
+		var v [][]byte
+		reflect.ValueOf(ptr).Elem().Set(reflect.ValueOf(v))
+		return nil
+	case sppb.TypeCode_ARRAY:
+		return fmt.Errorf("nested ARRAY type is not supported")
+	case sppb.TypeCode_STRUCT:
+		return fmt.Errorf("STRUCT type in ARRAY is not supported")
+	}
+	return fmt.Errorf("failed to decode NULL array element (unknown typecode: %d)", elemCode)
 }
 
 func getListValue(v *proto3.Value) (*proto3.ListValue, error) {

@@ -138,7 +138,6 @@ func TestDecodeToInterface(t *testing.T) {
 		assert.Equal(t, spanner.NullInt64{}, v)
 	}
 
-	// TODO: array, struct
 	// array
 	{
 		var gcv spanner.GenericColumnValue
@@ -150,6 +149,19 @@ func TestDecodeToInterface(t *testing.T) {
 			t.Fatal(err)
 		}
 		assert.ElementsMatch(t, []int64{1, 2, 3}, v)
+	}
+
+	// null array
+	{
+		var gcv spanner.GenericColumnValue
+		if err := testutils.SelectOne(ctx, `select cast(NULL as ARRAY<INT64>)`, c, &gcv); err != nil {
+			t.Fatal(err)
+		}
+		var v interface{}
+		if err := spankeys.DecodeToInterface(&gcv, &v); err != nil {
+			t.Fatal(err)
+		}
+		assert.Nil(t, v)
 	}
 
 	// array contains null
