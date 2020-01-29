@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"os"
 
+	"google.golang.org/api/option"
+	"google.golang.org/grpc"
+
 	"github.com/castaneai/spadmin"
 	"github.com/castaneai/spankeys"
 
@@ -38,12 +41,20 @@ func CountsRow(ctx context.Context, sql string, c *spanner.Client) (int64, error
 	return cnt, nil
 }
 
-func PrepareDatabase(ctx context.Context, ddls []string) error {
+func PrepareDatabase(ctx context.Context, ddls []string, opts ...option.ClientOption) error {
 	dsn, err := makeDSNFromEnv()
 	if err != nil {
 		return err
 	}
-	admin, err := spadmin.NewClient(dsn.Parent())
+	if emulatorAddr := os.Getenv("SPANNER_EMULATOR_HOST"); emulatorAddr != "" {
+		conn, err := grpc.DialContext(ctx, emulatorAddr, grpc.WithInsecure(), grpc.WithBlock())
+		if err != nil {
+			return err
+		}
+		opts = append(opts, option.WithGRPCConn(conn))
+	}
+
+	admin, err := spadmin.NewClient(ctx, dsn.Parent(), opts...)
 	if err != nil {
 		return err
 	}
