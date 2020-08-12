@@ -1,6 +1,7 @@
 package spankeys_test
 
 import (
+	"cloud.google.com/go/spanner"
 	"context"
 	"testing"
 
@@ -82,11 +83,11 @@ CREATE TABLE TestGetColumns (
 	}
 	assert.Equal(t, 3, len(cols))
 	assert.Equal(t, "ID", cols[0].Name)
-	assert.Equal(t, int64(1), cols[0].OrdinalPosition)
+	assert.Equal(t, spanner.NullInt64{Int64: 1, Valid: true}, cols[0].OrdinalPosition)
 	assert.Equal(t, "Name", cols[1].Name)
-	assert.Equal(t, int64(2), cols[1].OrdinalPosition)
+	assert.Equal(t, spanner.NullInt64{Int64: 2, Valid: true}, cols[1].OrdinalPosition)
 	assert.Equal(t, "Age", cols[2].Name)
-	assert.Equal(t, int64(3), cols[2].OrdinalPosition)
+	assert.Equal(t, spanner.NullInt64{Int64: 3, Valid: true}, cols[2].OrdinalPosition)
 }
 
 func TestGetPrimaryKeyColumns(t *testing.T) {
@@ -134,9 +135,9 @@ INTERLEAVE IN PARENT SinglePK ON DELETE CASCADE
 		}
 		assert.Equal(t, 2, len(pks))
 		assert.Equal(t, "ID1", pks[0].Name)
-		assert.Equal(t, int64(1), pks[0].OrdinalPosition)
+		assert.Equal(t, spanner.NullInt64{Int64: 1, Valid: true}, pks[0].OrdinalPosition)
 		assert.Equal(t, "ID2", pks[1].Name)
-		assert.Equal(t, int64(2), pks[1].OrdinalPosition)
+		assert.Equal(t, spanner.NullInt64{Int64: 2, Valid: true}, pks[1].OrdinalPosition)
 	}
 
 	{

@@ -14,7 +14,10 @@ type Table struct {
 
 type Column struct {
 	Name            string
-	OrdinalPosition int64
+
+	// ORDINAL_POSITION is nullable
+	// https://cloud.google.com/spanner/docs/information-schema#information_schemaindex_columns
+	OrdinalPosition spanner.NullInt64
 }
 
 type IndexColumn struct {
@@ -231,7 +234,7 @@ order by ORDINAL_POSITION`)
 		if err := r.ColumnByName("COLUMN_NAME", &colName); err != nil {
 			return err
 		}
-		var op int64
+		var op spanner.NullInt64
 		if err := r.ColumnByName("ORDINAL_POSITION", &op); err != nil {
 			return err
 		}
@@ -263,7 +266,7 @@ func GetColumns(ctx context.Context, client *spanner.Client, table string) ([]*C
 		if err := r.Column(0, &name); err != nil {
 			return err
 		}
-		var op int64
+		var op spanner.NullInt64
 		if err := r.Column(1, &op); err != nil {
 			return err
 		}
@@ -284,7 +287,7 @@ func GetPrimaryKeyColumns(ctx context.Context, client *spanner.Client, table str
 		if err := r.Column(0, &name); err != nil {
 			return err
 		}
-		var op int64
+		var op spanner.NullInt64
 		if err := r.Column(1, &op); err != nil {
 			return err
 		}
